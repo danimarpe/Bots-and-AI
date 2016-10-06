@@ -7,12 +7,37 @@ using System.Web.Http;
 using System.Web.Http.Description;
 using Microsoft.Bot.Connector;
 using Newtonsoft.Json;
+using BotDanimarpe.PesimistStrategy;
 
 namespace BotDanimarpe
 {
     [BotAuthentication]
     public class MessagesController : ApiController
     {
+        public IReplyText replyText;
+
+        MessagesController()
+        {
+            this.replyText = new Pesimist();
+        }
+
+        private Activity ReplyToText(Activity activity)
+        {
+
+            Activity reply = activity.CreateReply("");
+
+            if (!string.IsNullOrEmpty(activity.Text))
+            {
+                var analysisResult = replyText.AnalizeText(activity);
+
+                if (analysisResult != null)
+                {
+                    reply = activity.CreateReply(analysisResult);
+                }
+            }
+            return reply;
+        }
+
         /// <summary>
         /// POST: api/Messages
         /// Receive a message from a user and reply to it
@@ -22,12 +47,10 @@ namespace BotDanimarpe
             if (activity.Type == ActivityTypes.Message)
             {
                 ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
-                // calculate something for us to return
-                int length = (activity.Text ?? string.Empty).Length;
+                Activity reply = ReplyToText(activity);
 
-                // return our reply to the user
-                Activity reply = activity.CreateReply($"You sent {activity.Text} which was {length} characters");
                 await connector.Conversations.ReplyToActivityAsync(reply);
+                return new HttpResponseMessage(HttpStatusCode.Accepted);
             }
             else
             {
